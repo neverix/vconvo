@@ -5,12 +5,13 @@
       <sourceFolder url="file://$MODULE_DIR$/nnet" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/naive" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vcoder" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/warp" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/nnet/data" />
       <excludeFolder url="file://$MODULE_DIR$/vcoder/data" />
       <excludeFolder url="file://$MODULE_DIR$/vcoder/out" />
       <excludeFolder url="file://$MODULE_DIR$/vcoder/vctk" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="Python 3.8" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

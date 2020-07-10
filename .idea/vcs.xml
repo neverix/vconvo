@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/warp/Real-Time-Voice-Cloning" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/warp/TTS" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/warp/TTS/tts_namespace/TTS" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/warp/WaveRNN" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/warp/wavernn" vcs="Git" />
+  </component>
+</project>
