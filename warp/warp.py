@@ -2,23 +2,18 @@ import librosa
 import pyworld as pw
 import numpy as np
 from synth import synthesize
-from aeneas.exacttiming import TimeValue
-from aeneas.executetask import ExecuteTask
-from aeneas.language import Language
-from aeneas.syncmap import SyncMapFormat
-from aeneas.task import Task
-from aeneas.task import TaskConfiguration
-from aeneas.textfile import TextFileFormat
-import aeneas.globalconstants as gc
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from scipy import optimize
 
 
 sr = 22050
-hop_length = 128
-win_length = 256
+hop_length = 512
+compare_hop_length = 4410
+win_length = 1024
 n_fft = 4096
-n_mfcc = 64
-text_path = "out/text.txt"
-out_path = "out/align.txt"
+n_mfcc = 16
 
 
 def main(content, voice, text):
@@ -30,48 +25,40 @@ def main(content, voice, text):
     save(content, "content")
     save(voice, "voice")
 
-    c = warp_words(voice, content, "out/voice.wav", "out/content.wav", text)
-    c = warp(c, content)
-    c = freq(c, content)
+    c = warp(voice, content)
+    # c = freq(c, content)
     save(c, "result")
 
 
-def warp_words(a, b, a_path, b_path, text):
-    c = np.zeros_like(b)
-    for x, z in zip(aeneas(a_path, text), aeneas(b_path, text)):
-        x, y = x.begin, x.end
-        z, w = z.begin, z.end
-        x = int(x * sr)
-        y = int(y * sr)
-        z = int(z * sr)
-        w = int(w * sr)
-        if z - w != 0 and x - y != 0:
-            c[z:w] = librosa.effects.time_stretch(a[x:y], (x - y) / (z - w))
-    return c
-
-
-def aeneas(wav_path, text):
-    with open(text_path, 'w') as text_file:
-        text_file.write(text)
-    config_string = u"task_language=eng|is_text_type=mplain|os_task_file_format=txt"
-    task = Task(config_string=config_string)
-    task.audio_file_path_absolute = wav_path
-    task.text_file_path_absolute = text_path
-    task.sync_map_file_path_absolute = out_path
-    ExecuteTask(task).execute()
-    for leaf in task.sync_map.leaves():
-        if leaf.fragment_type == 0:
-            yield leaf.interval
-
-
 def warp(a, b):
-    a_mfcc = mfcc(a)
+    n_samples = len(b)
+    n_bins = n_samples // compare_hop_length
+    samples = np.random.uniform(0, 1/n_bins, n_bins)
     b_mfcc = mfcc(b)
-    _, wp = librosa.sequence.dtw(b_mfcc.T, a_mfcc.T)
-    a_spec = stft(a)
-    b_spec = np.zeros_like(stft(b))
-    b_spec[wp[:, 0]] = a_spec[wp[:, 1]]
-    c = istft(b_spec)
+
+    def synth(samples):
+        c = np.zeros(n_samples)
+        samples = np.abs(samples)
+        steps = samples / np.sum(samples) * len(a)
+        a_start = b_start = 0
+        b_step = compare_hop_length
+        for a_step in steps:
+            a_step = int(a_step)
+            a_end = a_start + a_step
+            b_end = b_start + b_step
+            c[b_start:b_end] = librosa.effects.time_stretch(a[a_start:a_end], a_step / b_step)
+            a_start += a_step
+            b_start += b_step
+        return c
+
+    def cost(samples):
+        c = synth(samples)
+        c_mfcc = mfcc(c)
+        distance = np.linalg.norm(b_mfcc - c_mfcc)
+        return distance
+
+    result, *_ = optimize.basinhopping(cost, samples, stepsize=0.01, disp=True)
+    c = synth(result)
     return c
 
 
@@ -85,6 +72,10 @@ def freq(a, b):
     ap = ap[:len(f0)]
     c = pw_synth(f0, sp, ap)
     return c
+
+
+def amplitude(a):
+    return librosa.core.amplitude_to_db(np.abs(librosa.stft(a, hop_length=hop_length, win_length=win_length).sum(axis=0)))
 
 
 def stft(x):
@@ -128,5 +119,5 @@ def save(d, fn="out"):
 
 
 if __name__ == '__main__':
-    main("mebama", "hellom", "What we've said consistently is that there has to"
+    main("mebama", "hellom", "What we've said consistently is that there has to "
          "be a political settlement to bring about genuine peace in the region.")
