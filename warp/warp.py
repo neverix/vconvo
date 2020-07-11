@@ -2,6 +2,14 @@ import librosa
 import pyworld as pw
 import numpy as np
 from synth import synthesize
+from aeneas.exacttiming import TimeValue
+from aeneas.executetask import ExecuteTask
+from aeneas.language import Language
+from aeneas.syncmap import SyncMapFormat
+from aeneas.task import Task
+from aeneas.task import TaskConfiguration
+from aeneas.textfile import TextFileFormat
+import aeneas.globalconstants as gc
 
 
 sr = 22050
@@ -9,6 +17,8 @@ hop_length = 128
 win_length = 256
 n_fft = 4096
 n_mfcc = 64
+text_path = "out/text.txt"
+out_path = "out/align.txt"
 
 
 def main(content, voice, text):
@@ -20,9 +30,38 @@ def main(content, voice, text):
     save(content, "content")
     save(voice, "voice")
 
-    c = warp(voice, content)
+    c = warp_words(voice, content, "out/voice.wav", "out/content.wav", text)
+    c = warp(c, content)
     c = freq(c, content)
     save(c, "result")
+
+
+def warp_words(a, b, a_path, b_path, text):
+    c = np.zeros_like(b)
+    for x, z in zip(aeneas(a_path, text), aeneas(b_path, text)):
+        x, y = x.begin, x.end
+        z, w = z.begin, z.end
+        x = int(x * sr)
+        y = int(y * sr)
+        z = int(z * sr)
+        w = int(w * sr)
+        if z - w != 0 and x - y != 0:
+            c[z:w] = librosa.effects.time_stretch(a[x:y], (x - y) / (z - w))
+    return c
+
+
+def aeneas(wav_path, text):
+    with open(text_path, 'w') as text_file:
+        text_file.write(text)
+    config_string = u"task_language=eng|is_text_type=mplain|os_task_file_format=txt"
+    task = Task(config_string=config_string)
+    task.audio_file_path_absolute = wav_path
+    task.text_file_path_absolute = text_path
+    task.sync_map_file_path_absolute = out_path
+    ExecuteTask(task).execute()
+    for leaf in task.sync_map.leaves():
+        if leaf.fragment_type == 0:
+            yield leaf.interval
 
 
 def warp(a, b):

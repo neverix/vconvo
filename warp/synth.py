@@ -7,11 +7,11 @@ import librosa
 import numpy as np
 
 
-fn = "out/synth.wav"
+fn = "out/synth.mp3"
 
 
 def synthesize(_voice, text):
-    tts = gtts.gTTS(text, slow=True)
+    tts = gtts.gTTS(text)
     tts.save(fn)
     x, sr = librosa.load(fn)
     x = x.astype(np.float64)
