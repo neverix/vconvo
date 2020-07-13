@@ -2,16 +2,15 @@ import librosa
 import pyworld as pw
 import numpy as np
 from synth import synthesize
+from scipy.spatial.distance import cdist
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from scipy import optimize
 
 
 sr = 22050
-hop_length = 512
-compare_hop_length = 4410
-win_length = 1024
+hop_length = 64
+win_length = 128
 n_fft = 4096
 n_mfcc = 16
 
@@ -31,34 +30,27 @@ def main(content, voice, text):
 
 
 def warp(a, b):
-    n_samples = len(b)
-    n_bins = n_samples // compare_hop_length
-    samples = np.random.uniform(0, 1/n_bins, n_bins)
+    a_stft = stft(a)
+    b_stft = stft(b)
+    a_mfcc = mfcc(a)
     b_mfcc = mfcc(b)
 
-    def synth(samples):
-        c = np.zeros(n_samples)
-        samples = np.abs(samples)
-        steps = samples / np.sum(samples) * len(a)
-        a_start = b_start = 0
-        b_step = compare_hop_length
-        for a_step in steps:
-            a_step = int(a_step)
-            a_end = a_start + a_step
-            b_end = b_start + b_step
-            c[b_start:b_end] = librosa.effects.time_stretch(a[a_start:a_end], a_step / b_step)
-            a_start += a_step
-            b_start += b_step
-        return c
+    dist = cdist(b_mfcc, a_mfcc)
+    prev = np.zeros_like(dist, dtype=np.int32)
+    for x in range(1, dist.shape[0]):
+        for y in range(dist.shape[1]):
+            sl = dist[x - 1, :y+1]
+            dist[x, y] += sl.min()
+            prev[x, y] = sl.argmin()
 
-    def cost(samples):
-        c = synth(samples)
-        c_mfcc = mfcc(c)
-        distance = np.linalg.norm(b_mfcc - c_mfcc)
-        return distance
-
-    result, *_ = optimize.basinhopping(cost, samples, stepsize=0.01, disp=True)
-    c = synth(result)
+    c_stft = np.zeros_like(b_stft)
+    x = dist.shape[0]
+    y = dist[-1].argmin()
+    while x > 0:
+        x -= 1
+        c_stft[x] = a_stft[y]
+        y = prev[x, y]
+    c = istft(c_stft)
     return c
 
 
