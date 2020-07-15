@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 
 
 sr = 22050
-hop_length = 64
-win_length = 128
+hop_length = 128
+win_length = 256
 n_fft = 4096
-n_mfcc = 16
+n_mfcc = 64
 
 
 def main(content, voice, text):
@@ -25,33 +25,19 @@ def main(content, voice, text):
     save(voice, "voice")
 
     c = warp(voice, content)
-    # c = freq(c, content)
+    c = vol(c, content)
+    c = freq(c, content)
     save(c, "result")
 
 
 def warp(a, b):
-    a_stft = stft(a)
-    b_stft = stft(b)
     a_mfcc = mfcc(a)
     b_mfcc = mfcc(b)
-
-    dist = cdist(b_mfcc, a_mfcc)
-    prev = np.zeros_like(dist, dtype=np.int32)
-    for x in range(1, dist.shape[0]):
-        for y in range(dist.shape[1]):
-            sl = dist[x - 1, :y+1]
-            dist[x, y] += sl.min()
-            prev[x, y] = sl.argmin()
-
-    c_stft = np.zeros_like(b_stft)
-    x = dist.shape[0]
-    y = dist[-1].argmin()
-    while x > 0:
-        x -= 1
-        c_stft[x] = a_stft[y]
-        y = prev[x, y]
-    c = istft(c_stft)
-    return c
+    _, wp = librosa.sequence.dtw(a_mfcc.T, b_mfcc.T)
+    a_spec = stft(a)[:a_mfcc.shape[0]]
+    b_spec = stft(b)[:b_mfcc.shape[0]]
+    b_spec[wp[:, 1]] = a_spec[wp[:, 0]]
+    return istft(b_spec)
 
 
 def freq(a, b):
@@ -66,8 +52,11 @@ def freq(a, b):
     return c
 
 
-def amplitude(a):
-    return librosa.core.amplitude_to_db(np.abs(librosa.stft(a, hop_length=hop_length, win_length=win_length).sum(axis=0)))
+def vol(a, b):
+    a_stft = stft(a)
+    b_stft = stft(b)
+    c_stft = a_stft / a_stft.sum(axis=0) * b_stft.sum(axis=0)
+    return istft(c_stft)
 
 
 def stft(x):
@@ -79,7 +68,11 @@ def istft(x):
 
 
 def mfcc(x):
-    return librosa.feature.mfcc(x, sr, n_mfcc=n_mfcc, hop_length=hop_length, win_length=win_length).T
+    f0, sp, ap = pw_extract(x)
+    f0[f0 != 0] = 150
+    y = pw_synth(f0, sp, ap)
+    mfcc = librosa.feature.mfcc(y, sr, n_mfcc=n_mfcc, hop_length=hop_length, win_length=win_length)
+    return mfcc.T[:stft(x).shape[0]]
 
 
 def pw_extract(x):
