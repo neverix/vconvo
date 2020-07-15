@@ -20,6 +20,7 @@ def main(source, voice):
     save(voice, "voice")
 
     target = warp(source, voice)
+    target = freq(source, voice, target)
     save(target, "target")
 
 
@@ -29,11 +30,24 @@ def warp(source, voice):
     source_feats = features(source)
     voice_feats = features(voice)
 
+    voice_spec = voice_spec[:len(voice_feats)]
+    voice_feats = voice_feats[:len(voice_spec)]
+
     dist = cdist(source_feats, voice_feats)
     target_spec = voice_spec[dist.argmin(axis=1)]
     target = istft(target_spec)
 
     return target
+
+
+def freq(a, b, c):
+    f0_source, *_ = pw_extract(a)
+    f0, *_ = pw_extract(b)
+    f0_target, sp, ap = pw_extract(c)
+    f0_source[f0_source != 0] -= np.median(f0_source[f0_source != 0])
+    f0 = (f0_source + np.median(f0[f0 != 0]))[:len(f0_target)]
+    c = pw_synth(f0, sp, ap)
+    return c
 
 
 def features(x):
@@ -86,4 +100,4 @@ def save(d, fn="out"):
 
 
 if __name__ == '__main__':
-    main("hare", "obama")
+    main("hare", "p4")
