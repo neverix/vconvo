@@ -30,11 +30,10 @@ def main(content, voice, text):
     save(c, "result")
 
 
-def do_warp(a, b):
-    c = warp(a, b)
-    c = vol(c, b)
-    c = freq(c, b)
-    return c
+def do_warp(b, text):
+    voice, sr_ = synthesize(b, text)
+    voice = librosa.resample(voice, sr_, sr)
+    return freq(vol(warp(voice, b), b), b)
 
 
 def warp(a, b):

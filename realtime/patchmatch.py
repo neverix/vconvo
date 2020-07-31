@@ -3,28 +3,31 @@ import pyworld as pw
 import numpy as np
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
+import wrp
 
 
 sr = 22050
 hop_length = 128
 win_length = 256
 n_fft = 4096
-n_mfcc = 6
+mfcc_min = 1
+mfcc_max = 6
 
 
-def main(source, voice):
+def main(source, voice, text):
     source = read(source)
     voice = read(voice)
 
     save(source, "source")
     save(voice, "voice")
 
-    target = warp(source, voice)
-    target = freq(source, voice, target)
+    target = wrp.do_warp(voice, text)
+    # target = patchmatch(target, voice)
+    # target = freq(source, voice, target)
     save(target, "target")
 
 
-def warp(source, voice):
+def patchmatch(source, voice):
     voice_spec = stft(voice)
 
     source_feats = features(source)
@@ -51,7 +54,20 @@ def freq(a, b, c):
 
 
 def features(x):
-    return mfcc(norm_pitch(x))  # TODO
+    f0, sp, ap = pw_extract(x)
+    f0[f0 != 0] = 150
+    y = pw_synth(f0, sp, ap)
+    spec = librosa.feature.melspectrogram(y, sr=sr, hop_length=hop_length, win_length=win_length)
+    # spec -= np.mean(spec, axis=0)
+    # spec /= np.var(spec, axis=0)
+    spec = librosa.power_to_db(spec)
+    m = librosa.feature.mfcc(S=spec, sr=sr, n_mfcc=mfcc_max, hop_length=hop_length, win_length=win_length)
+    m = m[mfcc_min:].T
+    return m
+
+
+def pad(x):
+    pass
 
 
 def norm_pitch(x):
@@ -62,7 +78,7 @@ def norm_pitch(x):
 
 
 def mfcc(x):
-    return librosa.feature.mfcc(x, sr, n_mfcc=n_mfcc, hop_length=hop_length, win_length=win_length).T
+    return librosa.feature.mfcc(x, sr, n_mfcc=mfcc_max, hop_length=hop_length, win_length=win_length).T
 
 
 def stft(x):
@@ -100,4 +116,5 @@ def save(d, fn="out"):
 
 
 if __name__ == '__main__':
-    main("hare", "p4")
+    main("mebama", "obama", "what we've said consistently is that there has to be a political settlement to bring "
+         "about genuine peace to the region")

@@ -8,31 +8,47 @@ sr = 22050
 hop_length = 128
 win_length = 256
 n_fft = 4096
-n_mfcc = 32
+n_mfcc = 64
 
 
-def main(content, voice):
+def main(content, voice_content, voice):
     content = read(content)
+    voice_content = read(voice_content)
     voice = read(voice)
 
     save(content, "content")
+    save(voice_content, "voice_content")
     save(voice, "voice")
 
-    c_spec = warp(content, voice)
-    c_spec = vol(content, c_spec)
-    c = istft(c_spec)
-    c = freq(content, c)
-    save(c, "result")
+    a, b = warp(voice_content, voice)
+
+    save(content, "result")
+
+
+def req
 
 
 def warp(a, b):
+    a = norm_pitch(a)
+    b = norm_pitch(b)
+
     a_mfcc = mfcc(a)
     b_mfcc = mfcc(b)
-    _, wp = librosa.sequence.dtw(a_mfcc.T, b_mfcc.T)
-    a_spec = np.zeros_like(stft(a))
+
+    a_spec = stft(a)
     b_spec = stft(b)
-    a_spec[wp[:, 0]] = b_spec[wp[:, 1]]
-    return a_spec
+
+    _, wp = librosa.sequence.dtw(a_mfcc.T, b_mfcc.T)
+    a_spec = a_spec[wp[::-1, 0]]
+    b_spec = b_spec[wp[::-1, 1]]
+    return a_spec, b_spec
+
+
+def norm_pitch(x):
+    f0, sp, ap = pw_extract(x)
+    f0[f0 != 0] = 150
+    y = pw_synth(f0, sp, ap)
+    return y
 
 
 def vol(a, b_spec):
@@ -41,14 +57,12 @@ def vol(a, b_spec):
     return c_spec
 
 
-def freq(a, b):
+def freq(a, b, c):
     f0_source, *_ = pw_extract(a)
-    f0, sp, ap = pw_extract(b)
+    f0, *_ = pw_extract(b)
+    f0_target, sp, ap = pw_extract(c)
     f0_source[f0_source != 0] -= np.median(f0_source[f0_source != 0])
-    f0 = (f0_source + np.median(f0[f0 != 0]))[:len(f0)] * (f0 != 0)
-    f0 = f0[:len(sp)]
-    sp = sp[:len(f0)]
-    ap = ap[:len(f0)]
+    f0 = (f0_source + np.median(f0[f0 != 0]))[:len(f0_target)]
     c = pw_synth(f0, sp, ap)
     return c
 
@@ -57,8 +71,16 @@ def stft(x):
     return librosa.stft(x, n_fft=n_fft, hop_length=hop_length, win_length=win_length).T
 
 
-def istft(x):
-    return librosa.istft(x.T, hop_length=hop_length, win_length=win_length)
+def istft(s):
+    return librosa.istft(s.T, hop_length=hop_length, win_length=win_length)
+
+
+def imfcc(m):
+    return librosa.feature.inverse.mfcc_to_audio(m.T, sr=sr, hop_length=hop_length, win_length=win_length)
+
+
+def mfcc_spec(s):
+    return mfcc(istft(s))
 
 
 def mfcc(x):
@@ -92,4 +114,4 @@ def save(d, fn="out"):
 
 
 if __name__ == '__main__':
-    main("hellom", "hello")
+    main("hello", "mebama", "obama")
